@@ -3,7 +3,7 @@ import Lens from "chrome-lens-ocr";
 const lens = new Lens();
 
 Bun.serve({
-  port: 3000,
+  port: 5007,
 
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
@@ -50,4 +50,4 @@ Bun.serve({
   },
 });
 
-console.log("Server running on http://localhost:3000");
+console.log("Server running on http://localhost:5007");
