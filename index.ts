@@ -15,7 +15,7 @@ type OCRApiResponse = {
 const OCR_REPLACE_RULES: [RegExp, string][] = [
   [/K\+/g, ""],
   [/ที่เจ/g, "ทีเจ"],
-  [/\s+/g, " "],
+  [/\s+/g, "\n"],
 ];
 
 function applyOCRReplace(text: string) {
