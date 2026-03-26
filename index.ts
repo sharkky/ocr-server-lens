@@ -39,7 +39,7 @@ Bun.serve({
         }
 
         return Response.json({
-          text: data.ocr_result.replace(/K\+/g, ""),
+          text: data.ocr_result.replace(/\nK\+/g, ""),
         });
       } catch (err) {
         const error = err as Error;
