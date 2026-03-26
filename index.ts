@@ -24,7 +24,7 @@ Bun.serve({
         const ocrForm = new FormData();
         ocrForm.append("file", file);
 
-        const ocrRes = await fetch("http://YOUR-IP:8000/upload", {
+        const ocrRes = await fetch("http://171.100.135.254:8000/upload", {
           method: "POST",
           headers: {
             Accept: "application/json",
