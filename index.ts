@@ -1,7 +1,3 @@
-import Lens from "chrome-lens-ocr";
-
-const lens = new Lens();
-
 Bun.serve({
   port: 5007,
 
@@ -20,24 +16,25 @@ Bun.serve({
           );
         }
 
-        const buffer = Buffer.from(await file.arrayBuffer());
+        const ocrForm = new FormData();
+        ocrForm.append("file", file);
 
-        const result = await lens.scanByBuffer(buffer);
-
-        const sortedSegments = result.segments.sort((a: any, b: any) => {
-          const yDiff =
-            a.boundingBox.pixelCoords.y - b.boundingBox.pixelCoords.y;
-
-          if (Math.abs(yDiff) < 10) {
-            return a.boundingBox.pixelCoords.x - b.boundingBox.pixelCoords.x;
-          }
-
-          return yDiff;
+        const ocrRes = await fetch("http://YOUR-IP:8000/upload", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+          },
+          body: ocrForm,
         });
 
+        const data = await ocrRes.json();
+
+        if (!data.success) {
+          return Response.json({ error: "OCR failed" }, { status: 500 });
+        }
+
         return Response.json({
-          text: sortedSegments.map((s: any) => s.text).join("\n"),
-          segments: sortedSegments,
+          text: data.ocr_result,
         });
       } catch (err) {
         const error = err as Error;
