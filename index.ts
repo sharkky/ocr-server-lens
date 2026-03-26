@@ -1,3 +1,8 @@
+type OCRResponse = {
+  success: boolean;
+  ocr_result: string;
+};
+
 Bun.serve({
   port: 5007,
 
@@ -27,7 +32,7 @@ Bun.serve({
           body: ocrForm,
         });
 
-        const data = await ocrRes.json();
+        const data = (await ocrRes.json()) as OCRResponse;
 
         if (!data.success) {
           return Response.json({ error: "OCR failed" }, { status: 500 });
