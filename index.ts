@@ -12,6 +12,56 @@ type OCRApiResponse = {
   ocr_boxes: OCRBox[];
 };
 
+const OCR_REPLACE_RULES: [RegExp, string][] = [
+  [/K\+/g, ""],
+  [/ที่เจ/g, "ทีเจ"],
+  [/\s+/g, " "],
+];
+
+function applyOCRReplace(text: string) {
+  let result = text;
+
+  for (const [pattern, replacement] of OCR_REPLACE_RULES) {
+    result = result.replace(pattern, replacement);
+  }
+
+  return result.trim();
+}
+
+function groupLines(boxes: OCRBox[]) {
+  const lines: OCRBox[][] = [];
+
+  boxes.sort((a, b) => a.y - b.y);
+
+  for (const box of boxes) {
+    let added = false;
+
+    for (const line of lines) {
+      const ref = line[0]!;
+      const threshold = ref.h * 0.6;
+
+      if (Math.abs(box.y - ref.y) < threshold) {
+        line.push(box);
+        added = true;
+        break;
+      }
+    }
+
+    if (!added) {
+      lines.push([box]);
+    }
+  }
+
+  return lines;
+}
+
+function mergeLine(line: OCRBox[]) {
+  return line
+    .sort((a, b) => a.x - b.x)
+    .map((b) => b.text)
+    .join("");
+}
+
 Bun.serve({
   port: 5007,
 
@@ -47,22 +97,13 @@ Bun.serve({
           return Response.json({ error: "OCR failed" }, { status: 500 });
         }
 
-        const sortedSegments = data.ocr_boxes.sort((a: any, b: any) => {
-          const yDiff = a.y - b.y;
+        const lines = groupLines(data.ocr_boxes);
+        const mergedLines = lines.map(mergeLine);
 
-          if (Math.abs(yDiff) < 10) {
-            return a.x - b.x;
-          }
+        let finalText = mergedLines.join("\n");
+        finalText = applyOCRReplace(finalText);
 
-          return yDiff;
-        });
-
-        return Response.json({
-          text: sortedSegments
-            .map((s) => s.text)
-            .join("\n")
-            .replace(/\nK\+/g, ""),
-        });
+        return Response.json({ text: finalText });
       } catch (err) {
         const error = err as Error;
 
