@@ -1,6 +1,15 @@
-type OCRResponse = {
+type OCRBox = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string;
+};
+
+type OCRApiResponse = {
   success: boolean;
   ocr_result: string;
+  ocr_boxes: OCRBox[];
 };
 
 Bun.serve({
@@ -32,14 +41,27 @@ Bun.serve({
           body: ocrForm,
         });
 
-        const data = (await ocrRes.json()) as OCRResponse;
+        const data = (await ocrRes.json()) as OCRApiResponse;
 
         if (!data.success) {
           return Response.json({ error: "OCR failed" }, { status: 500 });
         }
 
+        const sortedSegments = data.ocr_boxes.sort((a: any, b: any) => {
+          const yDiff = a.y - b.y;
+
+          if (Math.abs(yDiff) < 10) {
+            return a.x - b.x;
+          }
+
+          return yDiff;
+        });
+
         return Response.json({
-          text: data.ocr_result.replace(/\nK\+/g, ""),
+          text: sortedSegments
+            .map((s) => s.text)
+            .join("\n")
+            .replace(/\nK\+/g, ""),
         });
       } catch (err) {
         const error = err as Error;
