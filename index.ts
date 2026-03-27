@@ -5,7 +5,6 @@ type OCRBox = {
   h: number;
   text: string;
 };
-
 type OCRApiResponse = {
   success: boolean;
   ocr_result: string;
@@ -19,27 +18,26 @@ const OCR_REPLACE_RULES: [RegExp, string][] = [
 
 function applyOCRReplace(text: string) {
   let result = text;
-
   for (const [pattern, replacement] of OCR_REPLACE_RULES) {
     result = result.replace(pattern, replacement);
   }
-
   return result.trim();
 }
 
 function groupLines(boxes: OCRBox[]) {
   const lines: OCRBox[][] = [];
 
-  boxes.sort((a, b) => a.y - b.y);
+  const sorted = [...boxes].sort((a, b) => a.y - b.y);
 
-  for (const box of boxes) {
+  for (const box of sorted) {
     let added = false;
 
     for (const line of lines) {
-      const ref = line[0]!;
-      const threshold = ref.h * 0.6;
+      const avgY = line.reduce((sum, b) => sum + b.y, 0) / line.length;
+      const avgH = line.reduce((sum, b) => sum + b.h, 0) / line.length;
+      const threshold = avgH * 0.6;
 
-      if (Math.abs(box.y - ref.y) < threshold) {
+      if (Math.abs(box.y - avgY) < threshold) {
         line.push(box);
         added = true;
         break;
@@ -51,27 +49,45 @@ function groupLines(boxes: OCRBox[]) {
     }
   }
 
+  lines.sort((a, b) => {
+    const aY = a.reduce((sum, b) => sum + b.y, 0) / a.length;
+    const bY = b.reduce((sum, b) => sum + b.y, 0) / b.length;
+    return aY - bY;
+  });
+
   return lines;
 }
 
 function mergeLine(line: OCRBox[]) {
-  return line
-    .sort((a, b) => a.x - b.x)
-    .map((b) => b.text)
-    .join("");
+  const sorted = [...line].sort((a, b) => a.x - b.x);
+  let result = "";
+
+  for (let i = 0; i < sorted.length; i++) {
+    if (i === 0) {
+      result += sorted[i]!.text;
+      continue;
+    }
+    const prev = sorted[i - 1]!;
+    const curr = sorted[i]!;
+    const gap = curr.x - (prev.x + prev.w);
+
+    if (gap > prev.h * 0.5) {
+      result += " ";
+    }
+    result += curr.text;
+  }
+
+  return result;
 }
 
 Bun.serve({
   port: 5007,
-
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-
     if (url.pathname === "/ocr" && req.method === "POST") {
       try {
         const formData = await req.formData();
         const file = formData.get("image");
-
         if (!(file instanceof File)) {
           return Response.json(
             { error: "No image file provided" },
@@ -98,18 +114,15 @@ Bun.serve({
 
         const lines = groupLines(data.ocr_boxes);
         const mergedLines = lines.map(mergeLine);
-
         let finalText = mergedLines.join("\n");
         finalText = applyOCRReplace(finalText);
 
         return Response.json({ text: finalText });
       } catch (err) {
         const error = err as Error;
-
         return Response.json({ error: error.message }, { status: 500 });
       }
     }
-
     return Response.json({ error: "Not found" }, { status: 404 });
   },
 });
